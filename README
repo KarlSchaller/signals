@@ -5,6 +5,10 @@ Signals: Multiprocess vs. Multithread
 ===========================================
 
 The program prints the results for a simulation of signals in multiprocesses and multithreaded programs. These results are written in runs-process and runs-thread respectively (appended during program execution).
+To run a signals program for part A (timer) we add the cmd arg -1:
+	signals-process -1
+To run for part B, we specify the number of signals to run for:
+	signals-process 100000
 
 Results include signals sent and received (for SIGUSR1 and SIGUSR2) as well as the average time between signals for each 10 signal interval. This means that the sum of the counters should usually go up by 10 between each report (and they do).
 
