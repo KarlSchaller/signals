@@ -1,0 +1,14 @@
+Karl Schaller, CIS 3207, Project 4
+
+===========================================
+Signals: Multiprocess vs. Multithread
+===========================================
+
+The program prints the results for a simulation of signals in multiprocesses and multithreaded programs. These results are written in runs-process and runs-thread respectively (appended during program execution).
+
+Results include signals sent and received (for SIGUSR1 and SIGUSR2) as well as the average time between signals for each 10 signal interval. This means that the sum of the counters should usually go up by 10 between each report (and they do).
+
+It is harder to verify the validity of the average time between signals. Our program has 3 generators of signals, each producing a new signal on a uniform interval of 0.01-0.1 seconds (10-100 ms). Let us use an average of 50 ms for simplicity.
+Since the 2 types of signals have an equal chance of being produced, each generator should produce a SIGUSR1 every 100 ms on average. However, with 3 generators running, a SIGUSR will usually be generated every 30-40 ms.
+Our program results agree with this expected average, give or take for outliers that are produced every now and again when only one type of signal is produced multiple times in a row or signals are produced at the maximum 0.1 second interval.
+Also, when 0 of a certain signal are produced during a 10 signal interval, we would expect to see a "-nan" result for that signals average time, although this would only happen 0.09765625% of the time or 1 out of 1000 reports.
