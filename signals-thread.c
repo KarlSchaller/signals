@@ -26,26 +26,26 @@ int sentcount1 = 0, sentcount2 = 0;
 pthread_mutex_t sc1lock, sc2lock;
 int receivedcount1 = 0, receivedcount2 = 0;
 pthread_mutex_t rc1lock, rc2lock;
+int mode = 0;
 
 void *handlerfunction1(void *args);
-void handler1(int sig);
+//void handler1(int sig);
 void *handlerfunction2(void *args);
-void handler2(int sig);
+//void handler2(int sig);
 void *generatorfunction(void *args);
 void *reporterfunction(void *args);
-void reporthandler(int sig);
+//void reporthandler(int sig);
 
 int main(int argc, char **argv, char** envp) {
+	
+	if (argc == 2)
+		mode = atoi(argv[1]);
 	
 	srand(time(NULL));
 	pthread_mutex_init(&sc1lock, NULL);
 	pthread_mutex_init(&sc2lock, NULL);
 	pthread_mutex_init(&rc1lock, NULL);
 	pthread_mutex_init(&rc2lock, NULL);
-	//pthread_cond_init(&worknotempty, NULL);
-	//pthread_cond_init(&lognotempty, NULL);
-	//pthread_cond_init(&worknotfull, NULL);
-	//pthread_cond_init(&lognotfull, NULL);
 	
 	// Create handling threads
 	puts("Handlers");
@@ -66,15 +66,27 @@ int main(int argc, char **argv, char** envp) {
 		pthread_create(&(generatorthreads[i]), NULL, generatorfunction, NULL);
 	
 	// Main thread
-	sleep(30);
+	if (mode <= 0)
+		sleep(30);
 	
 	// Join threads
-	for (int i = 0; i < 4; i++)
-		pthread_join(handlerthreads[i], NULL);
-	for (int i = 0; i < 3; i++)
+	puts("Joining");
+	for (int i = 0; i < 3; i++) {
+		if (mode <= 0)
+			pthread_cancel(generatorthreads[i]);
 		pthread_join(generatorthreads[i], NULL);
+	}
+	for (int i = 0; i < 4; i++) {
+		pthread_cancel(handlerthreads[i]);
+		pthread_join(handlerthreads[i], NULL);
+	}
+	pthread_cancel(reporterthread);
 	pthread_join(reporterthread, NULL);
-	puts("Joined");
+	
+	if (mode == 0) { // execute 100K signals mode if default mode
+		char *args[] = {argv[0], "100000", NULL};
+		execvp(argv[0], args);
+	}
 	
 	exit(0);
 }
@@ -128,30 +140,30 @@ void *handlerfunction2(void *args) {
 // 3 threads for generating signals
 void *generatorfunction(void *args) {
 	puts("Generator: Start");
-	while (1) {
+	while (mode <= 0 || sentcount1 + sentcount2 < mode) {
 		if (rand() % 2 == 0) { // SIGUSR1 signal
+			puts("Generator: Incrementing SIGUSR1");
+			pthread_mutex_lock(&sc1lock);
+			sentcount1 += 1;
+			pthread_mutex_unlock(&sc1lock);
 			puts("Generator: Sending SIGUSR1");
 			if (rand() % 2 == 0)
 				pthread_kill(handlerthreads[0], SIGUSR1);
 			else
 				pthread_kill(handlerthreads[1], SIGUSR1);
 			pthread_kill(reporterthread, SIGUSR1);
-			puts("Generator: Incrementing SIGUSR1");
-			pthread_mutex_lock(&sc1lock);
-			sentcount1 += 1;
-			pthread_mutex_unlock(&sc1lock);
 		}
 		else { // SIGUSR2 signal
+			puts("Generator: Incrementing SIGUSR2");
+			pthread_mutex_lock(&sc2lock);
+			sentcount2 += 1;
+			pthread_mutex_unlock(&sc2lock);
 			puts("Generator: Sending SIGUSR2");
 			if (rand() % 2 == 0)
 				pthread_kill(handlerthreads[2], SIGUSR2);
 			else
 				pthread_kill(handlerthreads[3], SIGUSR2);
 			pthread_kill(reporterthread, SIGUSR2);
-			puts("Generator: Incrementing SIGUSR2");
-			pthread_mutex_lock(&sc2lock);
-			sentcount2 += 1;
-			pthread_mutex_unlock(&sc2lock);
 		}
 		puts("Generator: Waiting");
 		usleep(rand()%90001 + 10000);
@@ -167,43 +179,43 @@ void *reporterfunction(void *args) {
 	sigaddset(&rpset, SIGUSR1);
 	sigaddset(&rpset, SIGUSR2);
 	pthread_sigmask(SIG_BLOCK, &rpset, NULL);
-	
 
-	struct timeval s1_in, s2_in; //data to hold time of receiving
-	int sig; //sigwaitinfo retval holder
-	int s1_in_ct, s2_in_ct; //local counters for SIGUSR1 and 2.
-
-	struct timeval inittime, fintime, duration;
-	int sig1count = 0, sig2count = 0;
-	gettimeofday(&inittime, NULL);
+	struct timeval inittime1, inittime2, fintime1, fintime2, duration1, duration2;
+	int sig1count = 0, sig2count = 0, sig;
+	gettimeofday(&inittime1, NULL);
+	gettimeofday(&inittime2, NULL);
 	while(1) {
 		puts("Reporter: Pausing");
 		if ((sig = sigwaitinfo(&rpset, NULL)) == -1) break; // break on failure so we don't report on a failed signal catch
 		if(sig == SIGUSR1) {
 			puts("Reporter: Handling");
 			sig1count += 1;
+			gettimeofday(&fintime1, NULL);
 		}
 		if(sig == SIGUSR2) {
 			puts("Reporter: Handling");
 			sig2count += 1;
+			gettimeofday(&fintime2, NULL);
 		}
 		puts("Reporter: Pausing Done");
 		
 		if (sig1count + sig2count == 10) {
 			puts("Reporter: Reporting");
-			gettimeofday(&fintime, NULL);
-			timersub(&fintime, &inittime, &duration);
-			float mduration = duration.tv_sec*1000 + ((float)duration.tv_usec)/1000;
+			timersub(&fintime1, &inittime1, &duration1);
+			timersub(&fintime2, &inittime2, &duration2);
+			float mduration1 = duration1.tv_sec*1000 + ((float)duration1.tv_usec)/1000;
+			float mduration2 = duration2.tv_sec*1000 + ((float)duration2.tv_usec)/1000;
 			puts("================================================");
 			printf("SIGUSR1 sent: %d\n", sentcount1);
 			printf("SIGUSR1 received: %d\n", receivedcount1);
-			printf("SIGUSR1 avg time: %f ms\n", mduration/sig1count);
+			printf("SIGUSR1 avg time: %f ms\n", mduration1/sig1count);
 			printf("SIGUSR2 sent: %d\n", sentcount2);
 			printf("SIGUSR2 received: %d\n", receivedcount2);
-			printf("SIGUSR2 avg time: %f ms\n", mduration/sig2count);
+			printf("SIGUSR2 avg time: %f ms\n", mduration2/sig2count);
 			puts("================================================");
 			sig1count = sig2count = 0;
-			gettimeofday(&inittime, NULL);
+			inittime1 = fintime1;
+			inittime2 = fintime2;
 		}
 	}
 }
