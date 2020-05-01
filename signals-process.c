@@ -103,6 +103,8 @@ int main(int argc, char **argv, char** envp) {
 	kill(reporterprocess, SIGKILL);
 	
 	fclose(fp);
+	shmdt(countersptr);
+	shmctl(countersid, IPC_RMID, NULL);
 	
 	if (mode == 0) { // execute 100K signals mode if default mode
 		char *args[] = {argv[0], "100000", NULL};
