@@ -39,10 +39,16 @@ void *reporterfunction(void *args);
 
 int main(int argc, char **argv, char** envp) {
 	
-	if (argc == 2)
-		mode = atoi(argv[1]);
-	
 	fp = fopen("runs-thread", "a");
+	if (argc == 2) {
+		mode = atoi(argv[1]);
+		puts("PART B");
+		fprintf(fp, "PART B\n");
+	}
+	else {
+		puts("PART A");
+		fprintf(fp, "PART A\n");
+	}
 	
 	srand(time(NULL));
 	pthread_mutex_init(&sc1lock, NULL);
@@ -190,7 +196,7 @@ void *reporterfunction(void *args) {
 	gettimeofday(&inittime2, NULL);
 	while(1) {
 		puts("Reporter: Pausing");
-		if ((sig = sigwaitinfo(&rpset, NULL)) == -1) break; // break on failure so we don't report on a failed signal catch
+		if ((sig = sigwaitinfo(&rpset, NULL)) == -1) break; // break on failure
 		if(sig == SIGUSR1) {
 			puts("Reporter: Handling");
 			sig1count += 1;
