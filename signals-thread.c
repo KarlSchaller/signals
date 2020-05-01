@@ -27,6 +27,7 @@ pthread_mutex_t sc1lock, sc2lock;
 int receivedcount1 = 0, receivedcount2 = 0;
 pthread_mutex_t rc1lock, rc2lock;
 int mode = 0;
+FILE *fp;
 
 void *handlerfunction1(void *args);
 //void handler1(int sig);
@@ -40,6 +41,8 @@ int main(int argc, char **argv, char** envp) {
 	
 	if (argc == 2)
 		mode = atoi(argv[1]);
+	
+	fp = fopen("runs-thread", "a");
 	
 	srand(time(NULL));
 	pthread_mutex_init(&sc1lock, NULL);
@@ -83,11 +86,12 @@ int main(int argc, char **argv, char** envp) {
 	pthread_cancel(reporterthread);
 	pthread_join(reporterthread, NULL);
 	
+	fclose(fp);
+	
 	if (mode == 0) { // execute 100K signals mode if default mode
 		char *args[] = {argv[0], "100000", NULL};
 		execvp(argv[0], args);
 	}
-	
 	exit(0);
 }
 
@@ -179,7 +183,7 @@ void *reporterfunction(void *args) {
 	sigaddset(&rpset, SIGUSR1);
 	sigaddset(&rpset, SIGUSR2);
 	pthread_sigmask(SIG_BLOCK, &rpset, NULL);
-
+	
 	struct timeval inittime1, inittime2, fintime1, fintime2, duration1, duration2;
 	int sig1count = 0, sig2count = 0, sig;
 	gettimeofday(&inittime1, NULL);
@@ -205,7 +209,9 @@ void *reporterfunction(void *args) {
 			timersub(&fintime2, &inittime2, &duration2);
 			float mduration1 = duration1.tv_sec*1000 + ((float)duration1.tv_usec)/1000;
 			float mduration2 = duration2.tv_sec*1000 + ((float)duration2.tv_usec)/1000;
+			time_t systime = time(NULL);
 			puts("================================================");
+			printf("%s", ctime(&systime));
 			printf("SIGUSR1 sent: %d\n", sentcount1);
 			printf("SIGUSR1 received: %d\n", receivedcount1);
 			printf("SIGUSR1 avg time: %f ms\n", mduration1/sig1count);
@@ -213,6 +219,15 @@ void *reporterfunction(void *args) {
 			printf("SIGUSR2 received: %d\n", receivedcount2);
 			printf("SIGUSR2 avg time: %f ms\n", mduration2/sig2count);
 			puts("================================================");
+			fprintf(fp, "================================================\n");
+			fprintf(fp, "%s", ctime(&systime));
+			fprintf(fp, "SIGUSR1 sent: %d\n", sentcount1);
+			fprintf(fp, "SIGUSR1 received: %d\n", receivedcount1);
+			fprintf(fp, "SIGUSR1 avg time: %f ms\n", mduration1/sig1count);
+			fprintf(fp, "SIGUSR2 sent: %d\n", sentcount2);
+			fprintf(fp, "SIGUSR2 received: %d\n", receivedcount2);
+			fprintf(fp, "SIGUSR2 avg time: %f ms\n", mduration2/sig2count);
+			fprintf(fp, "================================================\n");
 			sig1count = sig2count = 0;
 			inittime1 = fintime1;
 			inittime2 = fintime2;
